@@ -14,12 +14,15 @@ using UnityEngine;
 
 namespace ShiftClickExplorer
 {
-	[BepInPlugin("ShiftClickExplorer", "ShiftClickExplorer", "1.0")]
+	[BepInPlugin("ShiftClickExplorer", "ShiftClickExplorer", "1.1")]
 	public class Main : BaseUnityPlugin
 	{
 		internal static ManualLogSource logger;
 
 		public static ConfigEntry<KeyboardShortcut> ModifierKey;
+		public static ConfigEntry<KeyboardShortcut> ModifierKey2;
+
+		static string[] Files;
 
 		public void Awake()
 		{
@@ -27,14 +30,27 @@ namespace ShiftClickExplorer
 
 			logger = this.Logger;
 
-			ModifierKey = Config.Bind("General", "Key To Activate", new KeyboardShortcut(KeyCode.LeftShift), "The key to hold while clicking a menu item for shift-click explorer.");
+			ModifierKey = Config.Bind("General", "Key To Activate", new KeyboardShortcut(KeyCode.LeftShift), "The key to hold while clicking a menu item for shift-click explorer. This one only opens the folder in which your menu file is found.");
+
+			ModifierKey2 = Config.Bind("General", "Key To Activate 2", new KeyboardShortcut(KeyCode.LeftShift, KeyCode.LeftControl), "The key to hold while clicking a menu item for shift-click explorer. This one opens the file itself if available.");
+
+			UnityEngine.SceneManagement.SceneManager.sceneLoaded += (s,e) => 
+			{
+				if (s.name.Equals("SceneEdit")) 
+				{
+					Files = null;
+				}
+			};
 		}
 
 		[HarmonyPatch(typeof(SceneEdit), "ClickCallback")]
 		[HarmonyPrefix]
 		private static bool HandleShiftClick()
 		{
-			if (ModifierKey.Value.IsDown() || ModifierKey.Value.IsPressed())
+			bool Modifier1 = ModifierKey.Value.IsDown() || ModifierKey.Value.IsPressed();
+			bool Modifier2 = ModifierKey2.Value.IsDown() || ModifierKey2.Value.IsPressed();
+
+			if (Modifier1 || Modifier2)
 			{
 				ButtonEdit componentInChildren = UIButton.current.GetComponentInChildren<ButtonEdit>();
 
@@ -44,15 +60,26 @@ namespace ShiftClickExplorer
 
 					if (!menu.IsNullOrWhiteSpace() && !Path.GetFileNameWithoutExtension(menu).Equals(menu))
 					{
+#if DEBUG
 						logger.LogDebug($"Key was pressed, checking {menu}");
+#endif
+						if (Files == null) 
+						{
+							Files = Directory.GetFiles(BepInEx.Paths.GameRootPath + "\\Mod", "*.menu", SearchOption.AllDirectories);
+							
+							Files = Files.Concat(Directory.GetFiles(BepInEx.Paths.GameRootPath + "\\Mod", "*.mod", SearchOption.AllDirectories)).ToArray();
+						}
 
-						string[] files = Directory.GetFiles(BepInEx.Paths.GameRootPath + "\\Mod", menu, SearchOption.AllDirectories);
-
+						var files = Files.Where(file => Path.GetFileName(file).ToLower().Equals(menu.ToLower()));
+#if DEBUG
 						logger.LogDebug($"Checking file count of: {menu}");
+#endif
 
 						if (files.Count() > 0)
 						{
+#if DEBUG
 							logger.LogDebug($"{menu} does exist in mod directory....");
+#endif
 
 							if (files.Count() > 1)
 							{
@@ -63,9 +90,17 @@ namespace ShiftClickExplorer
 							{
 								if (File.Exists(s))
 								{
+#if DEBUG
 									logger.LogDebug($"Opening window at {s}");
-
-									Process.Start(Path.GetDirectoryName(s));
+#endif
+									if (Modifier2)
+									{
+										Process.Start(s);
+									}
+									else
+									{
+										Process.Start("explorer.exe", "/select, " + s);
+									}
 								}
 							}
 						}
@@ -73,8 +108,9 @@ namespace ShiftClickExplorer
 						{
 							logger.LogInfo($"{menu} may not be a mod file or it isn't found in the Mod directory. The file name will be copied to your clipboard instead!");
 						}
-
+#if DEBUG
 						logger.LogDebug($"Done, copying {menu} to clipboard...");
+#endif
 
 						CopyToClipboard(menu);
 					}
