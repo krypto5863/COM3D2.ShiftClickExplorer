@@ -14,7 +14,7 @@ using UnityEngine;
 
 namespace ShiftClickExplorer
 {
-	[BepInPlugin("ShiftClickExplorer", "ShiftClickExplorer", "1.1")]
+	[BepInPlugin("ShiftClickExplorer", "ShiftClickExplorer", "1.2")]
 	public class Main : BaseUnityPlugin
 	{
 		internal static ManualLogSource logger;
@@ -65,9 +65,7 @@ namespace ShiftClickExplorer
 #endif
 						if (Files == null) 
 						{
-							Files = Directory.GetFiles(BepInEx.Paths.GameRootPath + "\\Mod", "*.menu", SearchOption.AllDirectories);
-							
-							Files = Files.Concat(Directory.GetFiles(BepInEx.Paths.GameRootPath + "\\Mod", "*.mod", SearchOption.AllDirectories)).ToArray();
+							Files = Directory.GetFiles(BepInEx.Paths.GameRootPath + "\\Mod", "*.*", SearchOption.AllDirectories).Where(t => t.ToLower().EndsWith(".menu") || t.ToLower().EndsWith(".mod")).ToArray();
 						}
 
 						var files = Files.Where(file => Path.GetFileName(file).ToLower().Equals(menu.ToLower()));
