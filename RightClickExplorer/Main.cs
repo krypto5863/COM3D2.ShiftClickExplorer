@@ -2,6 +2,7 @@
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -14,13 +15,14 @@ using UnityEngine;
 
 namespace ShiftClickExplorer
 {
-	[BepInPlugin("ShiftClickExplorer", "ShiftClickExplorer", "1.3")]
+	[BepInPlugin("ShiftClickExplorer", "ShiftClickExplorer", "1.3.1")]
 	public class Main : BaseUnityPlugin
 	{
 		internal static ManualLogSource logger;
 
 		public static ConfigEntry<KeyboardShortcut> ModifierKey;
 		public static ConfigEntry<KeyboardShortcut> ModifierKey2;
+		internal static readonly TextEditor editor = new TextEditor();
 
 		static string[] Files;
 
@@ -30,13 +32,13 @@ namespace ShiftClickExplorer
 
 			logger = this.Logger;
 
-			ModifierKey = Config.Bind("General", "Key To Activate", new KeyboardShortcut(KeyCode.LeftShift), "The key to hold while clicking a menu item for shift-click explorer. This one only opens the folder in which your menu file is found.");
+			ModifierKey = Config.Bind("General", "Open Containing Folder", new KeyboardShortcut(KeyCode.LeftShift), "The key to hold while clicking a menu item for shift-click explorer. This one only opens the folder in which your menu file is found if it's a mod file.");
 
-			ModifierKey2 = Config.Bind("General", "Key To Activate 2", new KeyboardShortcut(KeyCode.LeftShift, KeyCode.LeftControl), "The key to hold while clicking a menu item for shift-click explorer. This one opens the file itself if available.");
+			ModifierKey2 = Config.Bind("General", "Open File", new KeyboardShortcut(KeyCode.LeftShift, KeyCode.LeftControl), "The key to hold while clicking a menu item for shift-click explorer. This one opens the file itself if available.");
 
-			UnityEngine.SceneManagement.SceneManager.sceneLoaded += (s,e) => 
+			UnityEngine.SceneManagement.SceneManager.sceneLoaded += (s, e) =>
 			{
-				if (s.name.Equals("SceneEdit")) 
+				if (s.name.Equals("SceneEdit"))
 				{
 					Files = null;
 				}
@@ -49,6 +51,11 @@ namespace ShiftClickExplorer
 		{
 			bool Modifier1 = ModifierKey.Value.IsDown() || ModifierKey.Value.IsPressed();
 			bool Modifier2 = ModifierKey2.Value.IsDown() || ModifierKey2.Value.IsPressed();
+
+#if DEBUG
+
+			logger.LogDebug($"Was called on a menu! {Modifier1} || {Modifier2}");
+#endif
 
 			if (Modifier1 || Modifier2)
 			{
@@ -63,7 +70,7 @@ namespace ShiftClickExplorer
 #if DEBUG
 						logger.LogDebug($"Key was pressed, checking {menu}");
 #endif
-						if (Files == null) 
+						if (Files == null)
 						{
 							Files = Directory.GetFiles(BepInEx.Paths.GameRootPath + "\\Mod", "*.*", SearchOption.AllDirectories).Where(t => t.ToLower().EndsWith(".menu") || t.ToLower().EndsWith(".mod")).ToArray();
 						}
@@ -119,10 +126,9 @@ namespace ShiftClickExplorer
 		}
 		public static void CopyToClipboard(string s)
 		{
-			TextEditor te = new TextEditor();
-			te.text = s;
-			te.SelectAll();
-			te.Copy();
+			editor.text = s;
+			editor.SelectAll();
+			editor.Copy();
 		}
 	}
 }
