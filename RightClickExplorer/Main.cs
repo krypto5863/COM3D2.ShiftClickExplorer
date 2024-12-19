@@ -25,6 +25,7 @@ namespace ShiftClickExplorer
 		internal static readonly TextEditor editor = new TextEditor();
 
 		static string[] Files;
+		static string[] Presets;
 
 		public void Awake()
 		{
@@ -124,6 +125,74 @@ namespace ShiftClickExplorer
 			}
 			return true;
 		}
+		
+		[HarmonyPatch(typeof(PresetMgr), "ClickPreset")]
+		[HarmonyPrefix]
+		private static bool HandleShiftClickPreset()
+		{
+			bool Modifier1 = ModifierKey.Value.IsDown() || ModifierKey.Value.IsPressed();
+
+			if (Modifier1)
+			{
+				string presetName = UIButton.current.name;
+
+				if (presetName.EndsWith(".preset"))
+				{
+#if DEBUG
+					logger.LogDebug($"Current selected preset {presetName}");
+#endif
+					if (Presets == null)
+						Presets = Directory
+							.GetFiles(BepInEx.Paths.GameRootPath + "\\Preset", "*.*", SearchOption.AllDirectories)
+							.Where(t => t.ToLower().EndsWith(".preset")).ToArray();
+
+					var presets = Presets.Where(file => Path.GetFileName(file).ToLower().Equals(presetName.ToLower()));
+
+
+#if DEBUG
+					logger.LogDebug($"Checking file count of: {presetName}");
+#endif
+
+					if (presets.Count() > 0)
+					{
+#if DEBUG
+						logger.LogDebug($"{presetName} does exist in preset directory....");
+#endif
+
+						if (presets.Count() > 1)
+						{
+							logger.LogWarning(
+								$"{presetName} has duplicates in your preset directory! Multiple windows will open as a result.");
+						}
+
+						foreach (string s in presets)
+						{
+							if (File.Exists(s))
+							{
+#if DEBUG
+								logger.LogDebug($"Opening window at {s}");
+#endif
+								Process.Start("explorer.exe", "/select, " + s);
+							}
+						}
+					}
+					else
+					{
+						logger.LogInfo(
+							$"{presetName} may not be a mod file or it isn't found in the Mod directory. The file name will be copied to your clipboard instead!");
+					}
+#if DEBUG
+					logger.LogDebug($"Done, copying {presetName} to clipboard...");
+#endif
+
+					CopyToClipboard(presetName);
+				}
+				return false;
+			}
+			return true;
+		}
+		
+		
 		public static void CopyToClipboard(string s)
 		{
 			editor.text = s;
