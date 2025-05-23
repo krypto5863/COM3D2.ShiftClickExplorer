@@ -28,6 +28,17 @@ namespace ShiftClickExplorer
 		private static Lookup<string, string> filesLookup;
 		private static Lookup<string, string> presetsLookup;
 
+		private static Lookup<string, string> FilesLookup =>
+			filesLookup ?? (filesLookup =
+				(Lookup<string, string>)Directory.GetFiles(Paths.GameRootPath + "\\Mod", "*.*", SearchOption.AllDirectories)
+					.Where(t => t.ToLower().EndsWith(".menu") || t.ToLower().EndsWith(".mod"))
+					.ToLookup(path => Path.GetFileName(path), path => path, StringComparer.OrdinalIgnoreCase));
+
+		private static Lookup<string, string> PresetsLookup =>
+			presetsLookup ?? (presetsLookup =
+				(Lookup<string, string>)Directory.GetFiles(Paths.GameRootPath + "\\Preset", "*.preset", SearchOption.AllDirectories)
+					.ToLookup(presetPath => Path.GetFileName(presetPath), presetPath => presetPath, StringComparer.OrdinalIgnoreCase));
+
 		public void Awake()
 		{
 			harmony = Harmony.CreateAndPatchAll(typeof(Main));
@@ -83,14 +94,7 @@ namespace ShiftClickExplorer
 #if DEBUG
 						logger.LogDebug($"Key was pressed, checking {menu}");
 #endif
-						if (filesLookup == null)
-						{
-							filesLookup = (Lookup<string, string>)Directory.GetFiles(Paths.GameRootPath + "\\Mod", "*.*", SearchOption.AllDirectories)
-								.Where(t => t.ToLower().EndsWith(".menu") || t.ToLower().EndsWith(".mod"))
-								.ToLookup(path => Path.GetFileName(path), path => path, StringComparer.OrdinalIgnoreCase);
-						}
-
-						var files = filesLookup[menu];
+						var files = FilesLookup[menu];
 #if DEBUG
 						logger.LogDebug($"Checking file count of: {menu}");
 #endif
@@ -155,14 +159,7 @@ namespace ShiftClickExplorer
 #if DEBUG
 					logger.LogDebug($"Current selected preset {presetName}");
 #endif
-					if (presetsLookup == null)
-					{
-						presetsLookup = (Lookup<string, string>)Directory
-							.GetFiles(Paths.GameRootPath + "\\Preset", "*.preset", SearchOption.AllDirectories)
-							.ToLookup(presetPath => Path.GetFileName(presetPath), presetPath => presetPath, StringComparer.OrdinalIgnoreCase);
-					}
-
-					var presets = presetsLookup[presetName];
+					var presets = PresetsLookup[presetName];
 
 #if DEBUG
 					logger.LogDebug($"Checking file count of: {presetName}");
