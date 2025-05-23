@@ -1,4 +1,4 @@
-﻿using BepInEx;
+using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
@@ -25,8 +25,8 @@ namespace ShiftClickExplorer
 		internal static readonly TextEditor editor = new TextEditor();
 
 		private static Harmony harmony;
-		static string[] Files;
-		static string[] Presets;
+		private static Lookup<string, string> filesLookup;
+		private static Lookup<string, string> presetsLookup;
 
 		public void Awake()
 		{
@@ -45,15 +45,15 @@ namespace ShiftClickExplorer
 		{
 			if (s.name.Equals("SceneEdit"))
 			{
-				Files = null;
-				Presets = null;
+				filesLookup = null;
+				presetsLookup = null;
 			}
 		}
 
 		private void OnDestroy()
 		{
-			Files = null;
-			Presets = null;
+			filesLookup = null;
+			presetsLookup = null;
 			harmony?.UnpatchSelf();
 			UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded;
 		}
@@ -83,12 +83,14 @@ namespace ShiftClickExplorer
 #if DEBUG
 						logger.LogDebug($"Key was pressed, checking {menu}");
 #endif
-						if (Files == null)
+						if (filesLookup == null)
 						{
-							Files = Directory.GetFiles(BepInEx.Paths.GameRootPath + "\\Mod", "*.*", SearchOption.AllDirectories).Where(t => t.ToLower().EndsWith(".menu") || t.ToLower().EndsWith(".mod")).ToArray();
+							filesLookup = (Lookup<string, string>)Directory.GetFiles(Paths.GameRootPath + "\\Mod", "*.*", SearchOption.AllDirectories)
+								.Where(t => t.ToLower().EndsWith(".menu") || t.ToLower().EndsWith(".mod"))
+								.ToLookup(path => Path.GetFileName(path), path => path, StringComparer.OrdinalIgnoreCase);
 						}
 
-						var files = Files.Where(file => Path.GetFileName(file).ToLower().Equals(menu.ToLower()));
+						var files = filesLookup[menu];
 #if DEBUG
 						logger.LogDebug($"Checking file count of: {menu}");
 #endif
@@ -153,13 +155,14 @@ namespace ShiftClickExplorer
 #if DEBUG
 					logger.LogDebug($"Current selected preset {presetName}");
 #endif
-					if (Presets == null)
-						Presets = Directory
-							.GetFiles(BepInEx.Paths.GameRootPath + "\\Preset", "*.*", SearchOption.AllDirectories)
-							.Where(t => t.ToLower().EndsWith(".preset")).ToArray();
+					if (presetsLookup == null)
+					{
+						presetsLookup = (Lookup<string, string>)Directory
+							.GetFiles(Paths.GameRootPath + "\\Preset", "*.preset", SearchOption.AllDirectories)
+							.ToLookup(presetPath => Path.GetFileName(presetPath), presetPath => presetPath, StringComparer.OrdinalIgnoreCase);
+					}
 
-					var presets = Presets.Where(file => Path.GetFileName(file).ToLower().Equals(presetName.ToLower()));
-
+					var presets = presetsLookup[presetName];
 
 #if DEBUG
 					logger.LogDebug($"Checking file count of: {presetName}");
