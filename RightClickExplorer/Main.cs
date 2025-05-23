@@ -24,12 +24,13 @@ namespace ShiftClickExplorer
 		public static ConfigEntry<KeyboardShortcut> ModifierKey2;
 		internal static readonly TextEditor editor = new TextEditor();
 
+		private static Harmony harmony;
 		static string[] Files;
 		static string[] Presets;
 
 		public void Awake()
 		{
-			Harmony.CreateAndPatchAll(typeof(Main));
+			harmony = Harmony.CreateAndPatchAll(typeof(Main));
 
 			logger = this.Logger;
 
@@ -37,13 +38,24 @@ namespace ShiftClickExplorer
 
 			ModifierKey2 = Config.Bind("General", "Open File", new KeyboardShortcut(KeyCode.LeftShift, KeyCode.LeftControl), "The key to hold while clicking a menu item for shift-click explorer. This one opens the file itself if available.");
 
-			UnityEngine.SceneManagement.SceneManager.sceneLoaded += (s, e) =>
+			UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
+		}
+
+		private void OnSceneLoaded(UnityEngine.SceneManagement.Scene s, UnityEngine.SceneManagement.LoadSceneMode e)
+		{
+			if (s.name.Equals("SceneEdit"))
 			{
-				if (s.name.Equals("SceneEdit"))
-				{
-					Files = null;
-				}
-			};
+				Files = null;
+				Presets = null;
+			}
+		}
+
+		private void OnDestroy()
+		{
+			Files = null;
+			Presets = null;
+			harmony?.UnpatchSelf();
+			UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded;
 		}
 
 		[HarmonyPatch(typeof(SceneEdit), "ClickCallback")]
