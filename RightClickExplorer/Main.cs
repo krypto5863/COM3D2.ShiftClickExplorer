@@ -95,23 +95,16 @@ namespace ShiftClickExplorer
 #if DEBUG
 						logger.LogDebug($"Key was pressed, checking {menu}");
 #endif
-						foreach (string s in GetMenuFilePaths(menu))
+
+						if (Modifier1)
 						{
-							if (File.Exists(s))
-							{
-#if DEBUG
-								logger.LogDebug($"Opening window at {s}");
-#endif
-								if (Modifier2)
-								{
-									Process.Start(s);
-								}
-								else
-								{
-									Process.Start("explorer.exe", "/select, " + s);
-								}
-							}
+							RevealMenuFileInFileExplorer(menu);
 						}
+						else if (Modifier2)
+						{
+							OpenMenuFile(menu);
+						}
+
 #if DEBUG
 						logger.LogDebug($"Done, copying {menu} to clipboard...");
 #endif
@@ -139,18 +132,7 @@ namespace ShiftClickExplorer
 #if DEBUG
 					logger.LogDebug($"Current selected preset {presetName}");
 #endif
-
-					foreach (string s in GetPresetFilePaths(presetName))
-					{
-						if (File.Exists(s))
-						{
-#if DEBUG
-							logger.LogDebug($"Opening window at {s}");
-#endif
-							Process.Start("explorer.exe", "/select, " + s);
-						}
-					}
-
+					RevealPresetFileInFileExplorer(presetName);
 #if DEBUG
 					logger.LogDebug($"Done, copying {presetName} to clipboard...");
 #endif
@@ -223,6 +205,63 @@ namespace ShiftClickExplorer
 			}
 
 			return presets;
+		}
+
+		public static void RevealMenuFileInFileExplorer(string menuFile)
+		{
+			if (menuFile.IsNullOrWhiteSpace())
+			{
+				return;
+			}
+
+			foreach (string s in GetMenuFilePaths(menuFile))
+			{
+				if (File.Exists(s))
+				{
+#if DEBUG
+					logger.LogDebug($"Opening window at {s}");
+#endif
+					Process.Start("explorer.exe", "/select, " + s);
+				}
+			}
+		}
+
+		public static void OpenMenuFile(string menuFile)
+		{
+			if (menuFile.IsNullOrWhiteSpace())
+			{
+				return;
+			}
+
+			foreach (string s in GetMenuFilePaths(menuFile))
+			{
+				if (File.Exists(s))
+				{
+#if DEBUG
+					logger.LogDebug($"Opening window at {s}");
+#endif
+					Process.Start(s);
+				}
+			}
+		}
+
+		public static void RevealPresetFileInFileExplorer(string presetFile)
+		{
+			if (presetFile.IsNullOrWhiteSpace())
+			{
+				return;
+			}
+
+			foreach (string s in GetPresetFilePaths(presetFile))
+			{
+				if (File.Exists(s))
+				{
+#if DEBUG
+					logger.LogDebug($"Opening window at {s}");
+#endif
+					Process.Start("explorer.exe", "/select, " + s);
+				}
+			}
 		}
 
 		public static void CopyToClipboard(string s)
