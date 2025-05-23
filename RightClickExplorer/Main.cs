@@ -3,6 +3,7 @@ using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -94,43 +95,22 @@ namespace ShiftClickExplorer
 #if DEBUG
 						logger.LogDebug($"Key was pressed, checking {menu}");
 #endif
-						var files = FilesLookup[menu];
-#if DEBUG
-						logger.LogDebug($"Checking file count of: {menu}");
-#endif
-
-						if (files.Count() > 0)
+						foreach (string s in GetMenuFilePaths(menu))
 						{
+							if (File.Exists(s))
+							{
 #if DEBUG
-							logger.LogDebug($"{menu} does exist in mod directory....");
+								logger.LogDebug($"Opening window at {s}");
 #endif
-
-							if (files.Count() > 1)
-							{
-								logger.LogWarning($"{menu} has duplicates in your mod directory! Multiple windows will open as a result.");
-							}
-
-							foreach (string s in files)
-							{
-								if (File.Exists(s))
+								if (Modifier2)
 								{
-#if DEBUG
-									logger.LogDebug($"Opening window at {s}");
-#endif
-									if (Modifier2)
-									{
-										Process.Start(s);
-									}
-									else
-									{
-										Process.Start("explorer.exe", "/select, " + s);
-									}
+									Process.Start(s);
+								}
+								else
+								{
+									Process.Start("explorer.exe", "/select, " + s);
 								}
 							}
-						}
-						else
-						{
-							logger.LogInfo($"{menu} may not be a mod file or it isn't found in the Mod directory. The file name will be copied to your clipboard instead!");
 						}
 #if DEBUG
 						logger.LogDebug($"Done, copying {menu} to clipboard...");
@@ -159,40 +139,18 @@ namespace ShiftClickExplorer
 #if DEBUG
 					logger.LogDebug($"Current selected preset {presetName}");
 #endif
-					var presets = PresetsLookup[presetName];
 
-#if DEBUG
-					logger.LogDebug($"Checking file count of: {presetName}");
-#endif
-
-					if (presets.Count() > 0)
+					foreach (string s in GetPresetFilePaths(presetName))
 					{
-#if DEBUG
-						logger.LogDebug($"{presetName} does exist in preset directory....");
-#endif
-
-						if (presets.Count() > 1)
+						if (File.Exists(s))
 						{
-							logger.LogWarning(
-								$"{presetName} has duplicates in your preset directory! Multiple windows will open as a result.");
-						}
-
-						foreach (string s in presets)
-						{
-							if (File.Exists(s))
-							{
 #if DEBUG
-								logger.LogDebug($"Opening window at {s}");
+							logger.LogDebug($"Opening window at {s}");
 #endif
-								Process.Start("explorer.exe", "/select, " + s);
-							}
+							Process.Start("explorer.exe", "/select, " + s);
 						}
 					}
-					else
-					{
-						logger.LogInfo(
-							$"{presetName} may not be a mod file or it isn't found in the Mod directory. The file name will be copied to your clipboard instead!");
-					}
+
 #if DEBUG
 					logger.LogDebug($"Done, copying {presetName} to clipboard...");
 #endif
@@ -203,8 +161,70 @@ namespace ShiftClickExplorer
 			}
 			return true;
 		}
-		
-		
+
+		private static IEnumerable<string> GetMenuFilePaths(string menu)
+		{
+			if (menu.IsNullOrWhiteSpace())
+			{
+				return Enumerable.Empty<string>();
+			}
+
+			var files = FilesLookup[menu];
+#if DEBUG
+			logger.LogDebug($"Checking file count of: {menu}");
+#endif
+
+			if (files.Count() > 0)
+			{
+#if DEBUG
+				logger.LogDebug($"{menu} does exist in mod directory....");
+#endif
+
+				if (files.Count() > 1)
+				{
+					logger.LogWarning($"{menu} has duplicates in your mod directory! Multiple windows will open as a result.");
+				}
+			}
+			else
+			{
+				logger.LogInfo($"{menu} may not be a mod file or it isn't found in the Mod directory. The file name will be copied to your clipboard instead!");
+			}
+
+			return files;
+		}
+
+		private static IEnumerable<string> GetPresetFilePaths(string presetName)
+		{
+			if (presetName.IsNullOrWhiteSpace())
+			{
+				return Enumerable.Empty<string>();
+			}
+
+			var presets = PresetsLookup[presetName];
+
+#if DEBUG
+			logger.LogDebug($"Checking file count of: {presetName}");
+#endif
+
+			if (presets.Count() > 0)
+			{
+#if DEBUG
+				logger.LogDebug($"{presetName} does exist in preset directory....");
+#endif
+
+				if (presets.Count() > 1)
+				{
+					logger.LogWarning($"{presetName} has duplicates in your preset directory! Multiple windows will open as a result.");
+				}
+			}
+			else
+			{
+				logger.LogInfo($"{presetName} may not be a mod file or it isn't found in the Mod directory. The file name will be copied to your clipboard instead!");
+			}
+
+			return presets;
+		}
+
 		public static void CopyToClipboard(string s)
 		{
 			editor.text = s;
