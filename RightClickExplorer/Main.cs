@@ -16,7 +16,7 @@ using UnityEngine;
 
 namespace ShiftClickExplorer
 {
-	[BepInPlugin("ShiftClickExplorer", "ShiftClickExplorer", "1.3.1")]
+	[BepInPlugin("ShiftClickExplorer", "ShiftClickExplorer", "1.4.0")]
 	public class Main : BaseUnityPlugin
 	{
 		internal static ManualLogSource logger;
