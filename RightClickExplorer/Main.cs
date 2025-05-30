@@ -1,8 +1,9 @@
-﻿using BepInEx;
+using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -15,7 +16,7 @@ using UnityEngine;
 
 namespace ShiftClickExplorer
 {
-	[BepInPlugin("ShiftClickExplorer", "ShiftClickExplorer", "1.3.1")]
+	[BepInPlugin("ShiftClickExplorer", "ShiftClickExplorer", "1.4.0")]
 	public class Main : BaseUnityPlugin
 	{
 		internal static ManualLogSource logger;
@@ -24,12 +25,24 @@ namespace ShiftClickExplorer
 		public static ConfigEntry<KeyboardShortcut> ModifierKey2;
 		internal static readonly TextEditor editor = new TextEditor();
 
-		static string[] Files;
-		static string[] Presets;
+		private static Harmony harmony;
+		private static Lookup<string, string> filesLookup;
+		private static Lookup<string, string> presetsLookup;
+
+		private static Lookup<string, string> FilesLookup =>
+			filesLookup ?? (filesLookup =
+				(Lookup<string, string>)Directory.GetFiles(Paths.GameRootPath + "\\Mod", "*.*", SearchOption.AllDirectories)
+					.Where(t => t.ToLower().EndsWith(".menu") || t.ToLower().EndsWith(".mod"))
+					.ToLookup(path => Path.GetFileName(path), path => path, StringComparer.OrdinalIgnoreCase));
+
+		private static Lookup<string, string> PresetsLookup =>
+			presetsLookup ?? (presetsLookup =
+				(Lookup<string, string>)Directory.GetFiles(Paths.GameRootPath + "\\Preset", "*.preset", SearchOption.AllDirectories)
+					.ToLookup(presetPath => Path.GetFileName(presetPath), presetPath => presetPath, StringComparer.OrdinalIgnoreCase));
 
 		public void Awake()
 		{
-			Harmony.CreateAndPatchAll(typeof(Main));
+			harmony = Harmony.CreateAndPatchAll(typeof(Main));
 
 			logger = this.Logger;
 
@@ -37,13 +50,24 @@ namespace ShiftClickExplorer
 
 			ModifierKey2 = Config.Bind("General", "Open File", new KeyboardShortcut(KeyCode.LeftShift, KeyCode.LeftControl), "The key to hold while clicking a menu item for shift-click explorer. This one opens the file itself if available.");
 
-			UnityEngine.SceneManagement.SceneManager.sceneLoaded += (s, e) =>
+			UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
+		}
+
+		private void OnSceneLoaded(UnityEngine.SceneManagement.Scene s, UnityEngine.SceneManagement.LoadSceneMode e)
+		{
+			if (s.name.Equals("SceneEdit"))
 			{
-				if (s.name.Equals("SceneEdit"))
-				{
-					Files = null;
-				}
-			};
+				filesLookup = null;
+				presetsLookup = null;
+			}
+		}
+
+		private void OnDestroy()
+		{
+			filesLookup = null;
+			presetsLookup = null;
+			harmony?.UnpatchSelf();
+			UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded;
 		}
 
 		[HarmonyPatch(typeof(SceneEdit), "ClickCallback")]
@@ -71,49 +95,16 @@ namespace ShiftClickExplorer
 #if DEBUG
 						logger.LogDebug($"Key was pressed, checking {menu}");
 #endif
-						if (Files == null)
+
+						if (Modifier1)
 						{
-							Files = Directory.GetFiles(BepInEx.Paths.GameRootPath + "\\Mod", "*.*", SearchOption.AllDirectories).Where(t => t.ToLower().EndsWith(".menu") || t.ToLower().EndsWith(".mod")).ToArray();
+							RevealMenuFileInFileExplorer(menu);
+						}
+						else if (Modifier2)
+						{
+							OpenMenuFile(menu);
 						}
 
-						var files = Files.Where(file => Path.GetFileName(file).ToLower().Equals(menu.ToLower()));
-#if DEBUG
-						logger.LogDebug($"Checking file count of: {menu}");
-#endif
-
-						if (files.Count() > 0)
-						{
-#if DEBUG
-							logger.LogDebug($"{menu} does exist in mod directory....");
-#endif
-
-							if (files.Count() > 1)
-							{
-								logger.LogWarning($"{menu} has duplicates in your mod directory! Multiple windows will open as a result.");
-							}
-
-							foreach (string s in files)
-							{
-								if (File.Exists(s))
-								{
-#if DEBUG
-									logger.LogDebug($"Opening window at {s}");
-#endif
-									if (Modifier2)
-									{
-										Process.Start(s);
-									}
-									else
-									{
-										Process.Start("explorer.exe", "/select, " + s);
-									}
-								}
-							}
-						}
-						else
-						{
-							logger.LogInfo($"{menu} may not be a mod file or it isn't found in the Mod directory. The file name will be copied to your clipboard instead!");
-						}
 #if DEBUG
 						logger.LogDebug($"Done, copying {menu} to clipboard...");
 #endif
@@ -141,46 +132,7 @@ namespace ShiftClickExplorer
 #if DEBUG
 					logger.LogDebug($"Current selected preset {presetName}");
 #endif
-					if (Presets == null)
-						Presets = Directory
-							.GetFiles(BepInEx.Paths.GameRootPath + "\\Preset", "*.*", SearchOption.AllDirectories)
-							.Where(t => t.ToLower().EndsWith(".preset")).ToArray();
-
-					var presets = Presets.Where(file => Path.GetFileName(file).ToLower().Equals(presetName.ToLower()));
-
-
-#if DEBUG
-					logger.LogDebug($"Checking file count of: {presetName}");
-#endif
-
-					if (presets.Count() > 0)
-					{
-#if DEBUG
-						logger.LogDebug($"{presetName} does exist in preset directory....");
-#endif
-
-						if (presets.Count() > 1)
-						{
-							logger.LogWarning(
-								$"{presetName} has duplicates in your preset directory! Multiple windows will open as a result.");
-						}
-
-						foreach (string s in presets)
-						{
-							if (File.Exists(s))
-							{
-#if DEBUG
-								logger.LogDebug($"Opening window at {s}");
-#endif
-								Process.Start("explorer.exe", "/select, " + s);
-							}
-						}
-					}
-					else
-					{
-						logger.LogInfo(
-							$"{presetName} may not be a mod file or it isn't found in the Mod directory. The file name will be copied to your clipboard instead!");
-					}
+					RevealPresetFileInFileExplorer(presetName);
 #if DEBUG
 					logger.LogDebug($"Done, copying {presetName} to clipboard...");
 #endif
@@ -191,8 +143,127 @@ namespace ShiftClickExplorer
 			}
 			return true;
 		}
-		
-		
+
+		private static IEnumerable<string> GetMenuFilePaths(string menu)
+		{
+			if (menu.IsNullOrWhiteSpace())
+			{
+				return Enumerable.Empty<string>();
+			}
+
+			var files = FilesLookup[menu];
+#if DEBUG
+			logger.LogDebug($"Checking file count of: {menu}");
+#endif
+
+			if (files.Count() > 0)
+			{
+#if DEBUG
+				logger.LogDebug($"{menu} does exist in mod directory....");
+#endif
+
+				if (files.Count() > 1)
+				{
+					logger.LogWarning($"{menu} has duplicates in your mod directory! Multiple windows will open as a result.");
+				}
+			}
+			else
+			{
+				logger.LogInfo($"{menu} may not be a mod file or it isn't found in the Mod directory. The file name will be copied to your clipboard instead!");
+			}
+
+			return files;
+		}
+
+		private static IEnumerable<string> GetPresetFilePaths(string presetName)
+		{
+			if (presetName.IsNullOrWhiteSpace())
+			{
+				return Enumerable.Empty<string>();
+			}
+
+			var presets = PresetsLookup[presetName];
+
+#if DEBUG
+			logger.LogDebug($"Checking file count of: {presetName}");
+#endif
+
+			if (presets.Count() > 0)
+			{
+#if DEBUG
+				logger.LogDebug($"{presetName} does exist in preset directory....");
+#endif
+
+				if (presets.Count() > 1)
+				{
+					logger.LogWarning($"{presetName} has duplicates in your preset directory! Multiple windows will open as a result.");
+				}
+			}
+			else
+			{
+				logger.LogInfo($"{presetName} may not be a mod file or it isn't found in the Mod directory. The file name will be copied to your clipboard instead!");
+			}
+
+			return presets;
+		}
+
+		public static void RevealMenuFileInFileExplorer(string menuFile)
+		{
+			if (menuFile.IsNullOrWhiteSpace())
+			{
+				return;
+			}
+
+			foreach (string s in GetMenuFilePaths(menuFile))
+			{
+				if (File.Exists(s))
+				{
+#if DEBUG
+					logger.LogDebug($"Opening window at {s}");
+#endif
+					Process.Start("explorer.exe", "/select, " + s);
+				}
+			}
+		}
+
+		public static void OpenMenuFile(string menuFile)
+		{
+			if (menuFile.IsNullOrWhiteSpace())
+			{
+				return;
+			}
+
+			foreach (string s in GetMenuFilePaths(menuFile))
+			{
+				if (File.Exists(s))
+				{
+#if DEBUG
+					logger.LogDebug($"Opening window at {s}");
+#endif
+					Process.Start(s);
+				}
+			}
+		}
+
+		public static void RevealPresetFileInFileExplorer(string presetFile)
+		{
+			if (presetFile.IsNullOrWhiteSpace())
+			{
+				return;
+			}
+
+			foreach (string s in GetPresetFilePaths(presetFile))
+			{
+				if (File.Exists(s))
+				{
+#if DEBUG
+					logger.LogDebug($"Opening window at {s}");
+#endif
+					Process.Start("explorer.exe", "/select, " + s);
+				}
+			}
+		}
+
 		public static void CopyToClipboard(string s)
 		{
 			editor.text = s;
