@@ -221,7 +221,7 @@ namespace ShiftClickExplorer
 #if DEBUG
 					logger.LogDebug($"Opening window at {s}");
 #endif
-					Process.Start("explorer.exe", "/select, " + s);
+					Process.Start("explorer.exe", "/select, " + $"\"{s}\"");
 				}
 			}
 		}
@@ -259,7 +259,7 @@ namespace ShiftClickExplorer
 #if DEBUG
 					logger.LogDebug($"Opening window at {s}");
 #endif
-					Process.Start("explorer.exe", "/select, " + s);
+					Process.Start("explorer.exe", "/select, " + $"\"{s}\"");
 				}
 			}
 		}
